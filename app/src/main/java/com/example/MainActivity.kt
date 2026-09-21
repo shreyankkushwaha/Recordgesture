@@ -85,6 +85,7 @@ class MainActivity : ComponentActivity() {
         } else {
             @Suppress("DEPRECATION")
             window.addFlags(
+                WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
                 WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
                 WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
                 WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
@@ -101,7 +102,14 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleTriggerIntent(intent: Intent?) {
-        when (intent?.action) {
+        val action = intent?.action ?: return
+        if (action != "com.example.ACTION_TRIGGER_RECORD" && action != "com.example.ACTION_STOP_RECORD") {
+            return
+        }
+        // Consume intent action so activity recreation or configuration changes do not re-trigger
+        intent.action = null
+
+        when (action) {
             "com.example.ACTION_TRIGGER_RECORD" -> {
                 val scheduledDuration = intent.getIntExtra("EXTRA_SCHEDULED_DURATION", -1)
                 val useFront = if (intent.hasExtra("EXTRA_USE_FRONT_CAMERA")) {

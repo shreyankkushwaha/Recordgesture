@@ -2,7 +2,8 @@
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/accessibility_service_desc"
     android:accessibilityEventTypes="typeAllMask"
-    android:accessibilityFlags="flagRequestFilterKeyEvents|flagDefault"
-    android:accessibilityFeedbackType="feedbackGeneric"
-    android:notificationTimeout="100"
-    android:canRequestFilterKeyEvents="true" />
+    android:accessibilityFlags="flagRequestFilterKeyEvents|flagDefault|flagIncludeNotImportantViews|flagRetrieveInteractiveWindows"
+    android:accessibilityFeedbackType="feedbackGeneric|feedbackHaptic"
+    android:notificationTimeout="50"
+    android:canRequestFilterKeyEvents="true"
+    android:canRetrieveWindowContent="true" />

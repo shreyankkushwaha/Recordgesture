@@ -1,10 +1,17 @@
 package com.example.service
 
 import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.AccessibilityServiceInfo
+import android.app.ActivityOptions
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -13,18 +20,21 @@ import android.text.TextUtils
 import android.util.Log
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
+import androidx.core.app.NotificationCompat
 import com.example.MainActivity
+import com.example.QuickRecordApplication
+import com.example.R
 import com.example.camera.CameraRecorderManager
 import com.example.data.preferences.SettingsRepository
 import com.example.data.preferences.TriggerAction
 
 /**
  * Service to listen for hardware volume button events including:
- * - Volume button long-press (e.g. hold Volume Down or Volume Up for >= 800ms) to start or stop video recording
+ * - Volume button long-press (hold Volume Down or Volume Up for >= 800ms) to start or stop video recording
  * - Volume button double-press sequences
  *
- * Works seamlessly on locked devices and when the screen is off/ambient,
- * provided the user grants Accessibility permission.
+ * Works seamlessly on locked devices and in the background, automatically triggering
+ * recording without requiring the user to physically open the app first.
  */
 class VolumeButtonTriggerService : AccessibilityService() {
 
@@ -49,8 +59,27 @@ class VolumeButtonTriggerService : AccessibilityService() {
 
     override fun onCreate() {
         super.onCreate()
-        settingsRepository = SettingsRepository(this)
+        settingsRepository = (application as? QuickRecordApplication)?.settingsRepository
+            ?: SettingsRepository(this)
         Log.d(TAG, "VolumeButtonTriggerService created")
+    }
+
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        try {
+            val info = serviceInfo ?: AccessibilityServiceInfo()
+            info.flags = info.flags or
+                AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS or
+                AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS or
+                AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
+            info.eventTypes = AccessibilityEvent.TYPES_ALL_MASK
+            info.feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC or
+                AccessibilityServiceInfo.FEEDBACK_HAPTIC
+            serviceInfo = info
+            Log.d(TAG, "VolumeButtonTriggerService connected and dynamically configured")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error configuring serviceInfo in onServiceConnected", e)
+        }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -87,6 +116,7 @@ class VolumeButtonTriggerService : AccessibilityService() {
                     if (currentTrigger == TriggerAction.VOLUME_DOWN_DOUBLE) {
                         if (now - lastVolumeDownClickTime < DOUBLE_PRESS_WINDOW_MS) {
                             lastVolumeDownClickTime = 0L
+                            provideHapticFeedback()
                             triggerToggleRecording()
                             return true
                         } else {
@@ -98,6 +128,7 @@ class VolumeButtonTriggerService : AccessibilityService() {
                     if (currentTrigger == TriggerAction.VOLUME_UP_DOUBLE) {
                         if (now - lastVolumeUpClickTime < DOUBLE_PRESS_WINDOW_MS) {
                             lastVolumeUpClickTime = 0L
+                            provideHapticFeedback()
                             triggerToggleRecording()
                             return true
                         } else {
@@ -184,28 +215,104 @@ class VolumeButtonTriggerService : AccessibilityService() {
     private fun triggerToggleRecording() {
         val isCurrentlyRecording = CameraRecorderManager.isRecordingActive
 
-        val targetAction = if (isCurrentlyRecording) {
-            "com.example.ACTION_STOP_RECORD"
-        } else {
-            "com.example.ACTION_TRIGGER_RECORD"
+        if (isCurrentlyRecording) {
+            Log.d(TAG, "Active recording found! Stopping immediately directly from background service.")
+            val stopped = CameraRecorderManager.stopActiveRecording()
+            if (stopped) {
+                provideDoubleHapticFeedback()
+            }
+            return
         }
 
-        Log.d(TAG, "Toggling recording. isRecordingActive=$isCurrentlyRecording, firing action=$targetAction")
+        Log.d(TAG, "Triggering automatic background launch for recording start.")
 
-        val intent = Intent(this, MainActivity::class.java).apply {
-            action = targetAction
+        // 1. Acquire WakeLock to turn screen on and prevent sleep
+        val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
+        val wakeLock = powerManager?.newWakeLock(
+            PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
+            "QuickRecord:VolumeTriggerWakeLock"
+        )
+        try {
+            wakeLock?.acquire(15_000L) // 15 seconds
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to acquire wake lock", e)
+        }
+
+        // 2. Prepare launch intent for MainActivity
+        val launchIntent = Intent(this, MainActivity::class.java).apply {
+            action = "com.example.ACTION_TRIGGER_RECORD"
             addFlags(
                 Intent.FLAG_ACTIVITY_NEW_TASK or
                 Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                Intent.FLAG_ACTIVITY_SINGLE_TOP
+                Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
             )
         }
-        startActivity(intent)
+
+        // 3. Android 14+ (API 34+) background activity launch options
+        val activityOptionsBundle: Bundle? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            ActivityOptions.makeBasic().apply {
+                setPendingIntentBackgroundActivityStartMode(
+                    ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+                )
+            }.toBundle()
+        } else {
+            null
+        }
+
+        // 4. Create PendingIntent
+        val pendingFlags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            TRIGGER_REQUEST_CODE,
+            launchIntent,
+            pendingFlags
+        )
+
+        // 5. Post high-priority Heads-Up Notification with FullScreenIntent
+        // FullScreenIntent allows Android system to immediately pop the Activity to foreground
+        // even from locked screen or background
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+        val channelId = RecordingForegroundService.CHANNEL_RECORDING
+
+        val notification = NotificationCompat.Builder(this, channelId)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle(getString(R.string.notification_recording_title))
+            .setContentText("Hardware button triggered: starting capture automatically…")
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setFullScreenIntent(pendingIntent, true)
+            .setAutoCancel(true)
+            .setTimeoutAfter(6000L)
+            .build()
+
+        notificationManager?.notify(TRIGGER_NOTIFICATION_ID, notification)
+
+        // 6. Direct launch with PendingIntent and startActivity
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE && activityOptionsBundle != null) {
+                pendingIntent.send(this, 0, null, null, null, null, activityOptionsBundle)
+            } else {
+                pendingIntent.send()
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "pendingIntent.send failed", e)
+        }
+
+        try {
+            if (activityOptionsBundle != null) {
+                startActivity(launchIntent, activityOptionsBundle)
+            } else {
+                startActivity(launchIntent)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Direct startActivity failed, relying on fullScreenIntent", e)
+        }
     }
 
     private fun provideHapticFeedback() {
         try {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
                 val vibrator = vibratorManager?.defaultVibrator
                 vibrator?.vibrate(
@@ -222,6 +329,31 @@ class VolumeButtonTriggerService : AccessibilityService() {
         }
     }
 
+    private fun provideDoubleHapticFeedback() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                val vibrator = vibratorManager?.defaultVibrator
+                vibrator?.vibrate(
+                    VibrationEffect.createWaveform(longArrayOf(0, 100, 80, 100), -1)
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    vibrator?.vibrate(
+                        VibrationEffect.createWaveform(longArrayOf(0, 100, 80, 100), -1)
+                    )
+                } else {
+                    @Suppress("DEPRECATION")
+                    vibrator?.vibrate(longArrayOf(0, 100, 80, 100), -1)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error generating double haptic feedback", e)
+        }
+    }
+
     override fun onDestroy() {
         cancelLongPressTimer()
         super.onDestroy()
@@ -232,6 +364,8 @@ class VolumeButtonTriggerService : AccessibilityService() {
         private const val TAG = "VolumeTriggerService"
         const val LONG_PRESS_THRESHOLD_MS = 800L
         private const val DOUBLE_PRESS_WINDOW_MS = 600L
+        private const val TRIGGER_REQUEST_CODE = 4001
+        private const val TRIGGER_NOTIFICATION_ID = 2005
 
         fun isAccessibilityServiceEnabled(context: Context): Boolean {
             val expectedServiceName = "${context.packageName}/${VolumeButtonTriggerService::class.java.canonicalName}"
@@ -262,3 +396,4 @@ class VolumeButtonTriggerService : AccessibilityService() {
         }
     }
 }
+

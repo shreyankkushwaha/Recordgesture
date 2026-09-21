@@ -47,6 +47,13 @@ class CameraRecorderManager(
     private var timerJob: Job? = null
     private var currentOutputFile: File? = null
 
+    var isInitialized: Boolean = false
+        private set
+
+    init {
+        activeInstance = this
+    }
+
     // Callback when recording is successfully finalized
     var onRecordingFinished: ((savedFile: File, durationMs: Long) -> Unit)? = null
     var onRecordingError: ((errorMessage: String) -> Unit)? = null
@@ -62,9 +69,11 @@ class CameraRecorderManager(
             try {
                 cameraProvider = cameraProviderFuture.get()
                 bindCameraUseCases(lifecycleOwner, previewView, useFrontCamera)
+                isInitialized = true
                 onInitialized?.invoke()
             } catch (e: Exception) {
                 e.printStackTrace()
+                isInitialized = false
                 _recordingState.value = _recordingState.value.copy(
                     error = "Failed to initialize camera: ${e.localizedMessage}"
                 )
@@ -288,11 +297,28 @@ class CameraRecorderManager(
         stopTimer()
         cameraProvider?.unbindAll()
         isRecordingActive = false
+        if (activeInstance == this) {
+            activeInstance = null
+        }
     }
 
     companion object {
         @Volatile
-        var isRecordingActive: Boolean = false
+        var activeInstance: CameraRecorderManager? = null
             private set
+
+        @Volatile
+        var isRecordingActive: Boolean = false
+            internal set
+
+        fun stopActiveRecording(): Boolean {
+            val instance = activeInstance
+            return if (instance != null && instance.recordingState.value.isRecording) {
+                instance.stopRecording()
+                true
+            } else {
+                false
+            }
+        }
     }
 }

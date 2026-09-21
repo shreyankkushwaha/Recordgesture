@@ -9,10 +9,18 @@ import kotlinx.coroutines.flow.asStateFlow
 class SettingsRepository(context: Context) {
 
     private val prefs: SharedPreferences =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    private val prefChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+        _settings.value = loadSettings()
+    }
 
     private val _settings = MutableStateFlow(loadSettings())
     val settings: StateFlow<UserSettings> = _settings.asStateFlow()
+
+    init {
+        prefs.registerOnSharedPreferenceChangeListener(prefChangeListener)
+    }
 
     private fun loadSettings(): UserSettings {
         val triggerName = prefs.getString(KEY_TRIGGER, TriggerAction.VOLUME_DOWN_DOUBLE.name)
