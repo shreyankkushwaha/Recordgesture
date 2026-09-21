@@ -1,0 +1,26 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Camera Body Silhouette -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M30,38 C27.8,38 26,39.8 26,42 L26,66 C26,68.2 27.8,70 30,70 L64,70 C66.2,70 68,68.2 68,66 L68,42 C68,39.8 66.2,38 64,38 Z" />
+    <!-- Camera Lens / Cone -->
+    <path
+        android:fillColor="#E2E8F0"
+        android:pathData="M68,48 L80,41 C81.2,40.3 82.5,41.2 82.5,42.5 L82.5,65.5 C82.5,66.8 81.2,67.7 80,67 L68,60 Z" />
+    <!-- Record Aperture Ring -->
+    <path
+        android:fillColor="#0F172A"
+        android:pathData="M47,54 m-13,0 a13,13 0 1,0 26,0 a13,13 0 1,0 -26,0" />
+    <!-- Glowing Red Quick Record Dot -->
+    <path
+        android:fillColor="#EF4444"
+        android:pathData="M47,54 m-7.5,0 a7.5,7.5 0 1,0 15,0 a7.5,7.5 0 1,0 -15,0" />
+    <!-- Fast Action Flash / Speed Indicator -->
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M32,32 L38,32 L36,37 L42,37 L34,44 L35.5,39 L31,39 Z" />
+</vector>

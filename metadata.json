@@ -1,0 +1,6 @@
+{
+  "name": "Quick Recorder",
+  "description": "Quick-action video and audio recorder with lock screen support, hardware button triggers, encrypted local storage, and cloud backup.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

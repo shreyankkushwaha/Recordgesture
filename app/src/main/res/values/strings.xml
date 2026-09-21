@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">Quick Recorder</string>
+    <string name="accessibility_service_label">Volume Button Recording Trigger</string>
+    <string name="accessibility_service_desc">Enables hardware volume button long-press (hold for 1s to start or stop) and double-press detection to control video and microphone recording even when the screen is locked.</string>
+    <string name="quick_tile_label">Quick Record</string>
+    <string name="notification_channel_recording">Active Recording</string>
+    <string name="notification_channel_recording_desc">Displays ongoing video and audio recording status.</string>
+    <string name="notification_channel_quick_trigger">Lock Screen Quick Action</string>
+    <string name="notification_channel_quick_trigger_desc">Provides persistent lock screen quick action to record video instantly.</string>
+    <string name="notification_recording_title">Recording Active</string>
+    <string name="notification_recording_text">Capturing video with microphone audio…</string>
+    <string name="action_stop_recording">Stop Recording</string>
+    <string name="action_start_recording">Start Quick Recording</string>
+</resources>
