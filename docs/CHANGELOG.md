@@ -2,6 +2,25 @@
 
 All notable changes to the Quick Recorder project are documented in this file.
 
+## [1.2.0] - Scheduled Recording Feature
+
+### Added
+- **Scheduled Video & Audio Recording (`ScheduledRecordingManager`)**:
+  - Ability to set a future start time (via quick presets: +15s, +30s, +1m, +3m, +5m, +10m, +15m, +30m, +1h; or exact 24h clock hour:minute picker with today/tomorrow option).
+  - Configurable recording duration presets (15s, 30s, 1 min, 2 min, 3 min, 5 min, 10 min, 15 min, 30 min) with automatic stop and video finalization.
+  - Camera lens selection (Back Camera HD vs Front Selfie Camera).
+  - Optional pre-alert tactile haptic feedback (3 seconds prior to recording startup).
+  - Integration with Android `AlarmManager` (`setAlarmClock` / `setExactAndAllowWhileIdle`) and `SCHEDULE_EXACT_ALARM` permissions to ensure reliable execution even when the phone is locked or deep sleeping.
+- **Scheduled Recording Broadcast Receiver (`ScheduledRecordingReceiver`)**:
+  - Catches exact alarm triggers and screen wakeup intent with temporary wake lock.
+  - Displays high-priority full-screen intent notification over lockscreen.
+  - Handles cancel action directly from the persistent ongoing system notification.
+- **Scheduled Recording UI Components**:
+  - `ScheduleRecordingDialog`: Material 3 modal sheet with tabbed time picker (Quick Delays vs Exact Clock Time), duration chips, lens selection, and live target time calculation preview.
+  - `ScheduledRecordingCard`: Prominent card embedded in both Capture and Settings screens showing live real-time countdown timer (`00:04:15`), scheduled start time, duration, lens info, and quick actions ("Start Now", "Cancel", "Edit").
+- **Robolectric Test Suite**:
+  - Added unit tests validating schedule registration, duration formatting, countdown formatting, and cancellation in `ExampleRobolectricTest.kt`.
+
 ## [1.1.0] - Volume Long-Press Trigger Service
 
 ### Added

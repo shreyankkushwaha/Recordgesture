@@ -28,8 +28,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val settingsRepo = app.settingsRepository
     private val recordingsRepo = app.recordingsRepository
     private val cloudBackupManager = app.cloudBackupManager
+    private val scheduledRecordingManager = com.example.schedule.ScheduledRecordingManager.getInstance(application)
 
     val settings: StateFlow<UserSettings> = settingsRepo.settings
+    val activeSchedule: StateFlow<com.example.schedule.ScheduledRecording?> = scheduledRecordingManager.activeSchedule
+    val remainingSeconds: StateFlow<Long> = scheduledRecordingManager.remainingSeconds
+    val formattedCountdown: StateFlow<String> = scheduledRecordingManager.formattedCountdown
 
     val recordings: StateFlow<List<RecordingEntity>> = recordingsRepo.allRecordings
         .stateIn(
@@ -147,6 +151,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             recordingsRepo.deleteRecording(entity)
             _toastMessage.value = "Recording deleted"
         }
+    }
+
+    fun scheduleRecording(
+        targetTimeMillis: Long,
+        durationSeconds: Int,
+        useFrontCamera: Boolean,
+        preAlertEnabled: Boolean = true
+    ) {
+        val schedule = scheduledRecordingManager.scheduleRecording(
+            targetTimeMillis = targetTimeMillis,
+            durationSeconds = durationSeconds,
+            useFrontCamera = useFrontCamera,
+            preAlertEnabled = preAlertEnabled
+        )
+        val timeStr = com.example.schedule.ScheduledRecordingManager.formatTargetTime(targetTimeMillis)
+        val durStr = com.example.schedule.ScheduledRecordingManager.formatDuration(durationSeconds)
+        _toastMessage.value = "Recording scheduled for $timeStr ($durStr)"
+    }
+
+    fun cancelScheduledRecording() {
+        scheduledRecordingManager.cancelSchedule()
+        _toastMessage.value = "Scheduled recording canceled"
+    }
+
+    fun triggerScheduledRecordingNow() {
+        scheduledRecordingManager.triggerNow()
     }
 
     fun clearToast() {

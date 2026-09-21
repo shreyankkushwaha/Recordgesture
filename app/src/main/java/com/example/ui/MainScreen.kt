@@ -70,6 +70,8 @@ import com.example.service.RecordingState
 import com.example.ui.components.PermissionsCard
 import com.example.ui.components.RecordHud
 import com.example.ui.components.RecordingsListSection
+import com.example.ui.components.ScheduleRecordingDialog
+import com.example.ui.components.ScheduledRecordingCard
 import com.example.ui.components.SettingsSection
 import com.example.ui.components.TriggerSelectorCard
 import com.example.ui.components.VideoPlaybackDialog
@@ -91,9 +93,12 @@ fun MainScreen(
     val recordingState by recorderManager.recordingState.collectAsState()
     val toastMessage by viewModel.toastMessage.collectAsState()
     val isBackingUpId by viewModel.isBackingUp.collectAsState()
+    val activeSchedule by viewModel.activeSchedule.collectAsState()
+    val formattedCountdown by viewModel.formattedCountdown.collectAsState()
 
     var selectedTab by remember { mutableIntStateOf(0) }
     var selectedPlaybackRecording by remember { mutableStateOf<RecordingEntity?>(null) }
+    var showScheduleDialog by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(toastMessage) {
@@ -195,9 +200,14 @@ fun MainScreen(
                 0 -> CaptureTab(
                     recordingState = recordingState,
                     settings = settings,
+                    activeSchedule = activeSchedule,
+                    formattedCountdown = formattedCountdown,
                     previewView = previewView,
                     onStartRecording = onStartRecording,
                     onStopRecording = onStopRecording,
+                    onOpenScheduleDialog = { showScheduleDialog = true },
+                    onCancelSchedule = { viewModel.cancelScheduledRecording() },
+                    onStartScheduledNow = { viewModel.triggerScheduledRecordingNow() },
                     onPermissionsUpdated = {
                         viewModel.checkAccessibilityStatus(context)
                     }
@@ -216,6 +226,11 @@ fun MainScreen(
                 2 -> SettingsTab(
                     settings = settings,
                     isAccessibilityEnabled = isAccessibilityEnabled,
+                    activeSchedule = activeSchedule,
+                    formattedCountdown = formattedCountdown,
+                    onOpenScheduleDialog = { showScheduleDialog = true },
+                    onCancelSchedule = { viewModel.cancelScheduledRecording() },
+                    onStartScheduledNow = { viewModel.triggerScheduledRecordingNow() },
                     onSelectTrigger = { viewModel.updateTriggerAction(it) },
                     onOpenAccessibility = {
                         context.startActivity(QuickActionAccessibilityService.openAccessibilitySettingsIntent())
@@ -241,6 +256,24 @@ fun MainScreen(
                     }
                 )
             }
+
+            // Schedule Recording Dialog
+            if (showScheduleDialog) {
+                ScheduleRecordingDialog(
+                    initialDurationSeconds = settings.maxDurationSeconds,
+                    initialUseFrontCamera = settings.useFrontCamera,
+                    onDismiss = { showScheduleDialog = false },
+                    onConfirmSchedule = { targetTimeMillis, durationSeconds, useFrontCamera, preAlert ->
+                        viewModel.scheduleRecording(
+                            targetTimeMillis = targetTimeMillis,
+                            durationSeconds = durationSeconds,
+                            useFrontCamera = useFrontCamera,
+                            preAlertEnabled = preAlert
+                        )
+                        showScheduleDialog = false
+                    }
+                )
+            }
         }
     }
 }
@@ -249,9 +282,14 @@ fun MainScreen(
 private fun CaptureTab(
     recordingState: RecordingState,
     settings: com.example.data.preferences.UserSettings,
+    activeSchedule: com.example.schedule.ScheduledRecording?,
+    formattedCountdown: String,
     previewView: PreviewView,
     onStartRecording: () -> Unit,
     onStopRecording: () -> Unit,
+    onOpenScheduleDialog: () -> Unit,
+    onCancelSchedule: () -> Unit,
+    onStartScheduledNow: () -> Unit,
     onPermissionsUpdated: () -> Unit
 ) {
     val scrollState = rememberScrollState()
@@ -471,6 +509,17 @@ private fun CaptureTab(
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Scheduled Recording Section
+            ScheduledRecordingCard(
+                activeSchedule = activeSchedule,
+                formattedCountdown = formattedCountdown,
+                onOpenScheduleDialog = onOpenScheduleDialog,
+                onCancelSchedule = onCancelSchedule,
+                onStartNow = onStartScheduledNow
+            )
         }
     }
 }
@@ -509,6 +558,11 @@ private fun RecordingsTab(
 private fun SettingsTab(
     settings: com.example.data.preferences.UserSettings,
     isAccessibilityEnabled: Boolean,
+    activeSchedule: com.example.schedule.ScheduledRecording?,
+    formattedCountdown: String,
+    onOpenScheduleDialog: () -> Unit,
+    onCancelSchedule: () -> Unit,
+    onStartScheduledNow: () -> Unit,
     onSelectTrigger: (com.example.data.preferences.TriggerAction) -> Unit,
     onOpenAccessibility: () -> Unit,
     onMaxDurationChanged: (Int) -> Unit,
@@ -526,6 +580,17 @@ private fun SettingsTab(
             .verticalScroll(scrollState)
             .padding(16.dp)
     ) {
+        // Scheduled Recording Option Card
+        ScheduledRecordingCard(
+            activeSchedule = activeSchedule,
+            formattedCountdown = formattedCountdown,
+            onOpenScheduleDialog = onOpenScheduleDialog,
+            onCancelSchedule = onCancelSchedule,
+            onStartNow = onStartScheduledNow
+        )
+
+        Spacer(modifier = Modifier.height(14.dp))
+
         // Permissions Card
         PermissionsCard(onPermissionsUpdated = onPermissionsUpdated)
 

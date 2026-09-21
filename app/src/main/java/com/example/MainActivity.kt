@@ -103,10 +103,21 @@ class MainActivity : ComponentActivity() {
     private fun handleTriggerIntent(intent: Intent?) {
         when (intent?.action) {
             "com.example.ACTION_TRIGGER_RECORD" -> {
+                val scheduledDuration = intent.getIntExtra("EXTRA_SCHEDULED_DURATION", -1)
+                val useFront = if (intent.hasExtra("EXTRA_USE_FRONT_CAMERA")) {
+                    intent.getBooleanExtra("EXTRA_USE_FRONT_CAMERA", false)
+                } else null
+
                 lifecycleScope.launch {
-                    // Small delay to ensure CameraX surface provider is attached
-                    delay(300L)
-                    triggerStartRecording()
+                    if (useFront != null && useFront != viewModel.settings.value.useFrontCamera) {
+                        recorderManager.bindCameraUseCases(this@MainActivity, previewView, useFront)
+                        delay(350L)
+                    } else {
+                        // Small delay to ensure CameraX surface provider is attached
+                        delay(300L)
+                    }
+                    val targetDuration = if (scheduledDuration > 0) scheduledDuration else viewModel.settings.value.maxDurationSeconds
+                    triggerStartRecording(targetDuration)
                 }
             }
             "com.example.ACTION_STOP_RECORD" -> {
@@ -115,9 +126,10 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun triggerStartRecording() {
+    private fun triggerStartRecording(durationOverride: Int? = null) {
         if (!recorderManager.recordingState.value.isRecording) {
-            recorderManager.startRecording(viewModel.settings.value.maxDurationSeconds)
+            val duration = durationOverride ?: viewModel.settings.value.maxDurationSeconds
+            recorderManager.startRecording(duration)
         }
     }
 

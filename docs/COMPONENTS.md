@@ -65,3 +65,25 @@
   - Tactile haptic feedback via `Vibrator` / `VibratorManager`.
   - Operates when screen is locked or off through `canRequestFilterKeyEvents`.
   - Passes through standard short volume presses to the Android audio subsystem.
+
+### 8. `ScheduleRecordingDialog`
+- **Location**: `com.example.ui.components.ScheduleRecordingDialog`
+- **Purpose**: Modal sheet providing interactive configuration of future recording triggers.
+- **Features**:
+  - Tabbed start time selector: "Quick Delay" (+15s test, +30s, +1m, +3m, +5m, +10m, +15m, +30m, +1h) and "Specific Clock Time" (24h hour:minute steppers + Today/Tomorrow toggle).
+  - Duration presets (15s, 30s, 1m, 2m, 3m, 5m, 10m, 15m, 30m) with auto-stop and auto-save.
+  - Camera lens toggle (Back HD vs Front Selfie).
+  - Tactile pre-alert vibration switch (3-second warning prior to recording start).
+  - Real-time preview calculation card displaying formatted target start timestamp and capture summary.
+
+### 9. `ScheduledRecordingCard`
+- **Location**: `com.example.ui.components.ScheduledRecordingCard`
+- **Purpose**: Responsive UI card integrated on Capture and Settings tabs reflecting scheduled state.
+- **Features**:
+  - When idle: Displays an inviting CTA banner with direct "Schedule" trigger button.
+  - When active: Displays prominent pulse indicator, live real-time monospace countdown clock (`00:04:15`), scheduled start time, configured duration, lens selection, "Start Now" direct execution button, and "Cancel Schedule" action.
+
+### 10. `ScheduledRecordingManager` & `ScheduledRecordingReceiver`
+- **Location**: `com.example.schedule.ScheduledRecordingManager`, `com.example.schedule.ScheduledRecordingReceiver`
+- **Purpose**: System-level coordinator for exact alarm scheduling, lifecycle state persistence, live countdown StateFlow, lockscreen wakeup, and ongoing notification management.
+

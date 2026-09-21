@@ -30,6 +30,9 @@ class ExampleRobolectricTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val repository = SettingsRepository(context)
 
+        assertEquals(TriggerAction.VOLUME_DOWN_DOUBLE, repository.settings.value.triggerAction)
+
+        repository.updateTriggerAction(TriggerAction.VOLUME_LONG_PRESS)
         assertEquals(TriggerAction.VOLUME_LONG_PRESS, repository.settings.value.triggerAction)
 
         repository.updateTriggerAction(TriggerAction.QUICK_SETTINGS_TILE)
@@ -67,5 +70,41 @@ class ExampleRobolectricTest {
         sampleFile.delete()
         encryptedFile.delete()
         decryptedFile.delete()
+    }
+
+    @Test
+    fun `scheduled recording manager schedules, tracks and cancels schedule`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val manager = com.example.schedule.ScheduledRecordingManager.getInstance(context)
+
+        // Cancel any previous state
+        manager.cancelSchedule()
+        org.junit.Assert.assertNull(manager.activeSchedule.value)
+
+        val futureTarget = System.currentTimeMillis() + 120_000L // 2 minutes in future
+        val schedule = manager.scheduleRecording(
+            targetTimeMillis = futureTarget,
+            durationSeconds = 90,
+            useFrontCamera = true,
+            preAlertEnabled = true
+        )
+
+        assertNotNull(manager.activeSchedule.value)
+        assertEquals(schedule.id, manager.activeSchedule.value?.id)
+        assertEquals(90, manager.activeSchedule.value?.durationSeconds)
+        assertEquals(true, manager.activeSchedule.value?.useFrontCamera)
+        assertEquals(true, manager.activeSchedule.value?.preAlertEnabled)
+
+        // Test formatting helpers
+        val formattedDur = com.example.schedule.ScheduledRecordingManager.formatDuration(90)
+        assertEquals("1m 30s", formattedDur)
+
+        val formattedClock = com.example.schedule.ScheduledRecordingManager.formatSecondsToClock(75)
+        assertEquals("01:15", formattedClock)
+
+        // Cancel schedule
+        manager.cancelSchedule()
+        org.junit.Assert.assertNull(manager.activeSchedule.value)
+        assertEquals(0L, manager.remainingSeconds.value)
     }
 }

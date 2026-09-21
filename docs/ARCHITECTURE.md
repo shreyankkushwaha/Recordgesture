@@ -45,6 +45,7 @@ Quick Recorder uses modern **Model-View-ViewModel (MVVM)** and **Clean Architect
 - **`QuickRecordTileService`**: System Quick Settings tile triggering recording directly from the lock screen shade.
 - **`RecordingForegroundService`**: Maintains ongoing foreground notification (`FOREGROUND_SERVICE_TYPE_CAMERA` & `FOREGROUND_SERVICE_TYPE_MICROPHONE`) to ensure uninterrupted recording during lock screen and app transitions.
 - **`ShakeDetector`**: Computes g-force acceleration vector to identify intentional shake gestures.
+- **`ScheduledRecordingManager` & `ScheduledRecordingReceiver`**: Coordinates exact Android `AlarmManager` wakeups, persists active schedule configuration in shared preferences, publishes persistent notifications with one-tap cancellation, and delivers full-screen wakeup intents to `MainActivity` with tailored duration and camera lens settings.
 
 ### 4. Data & Security Layer
 - **`CryptoManager`**: AES-256-GCM symmetric cipher backed by `AndroidKeyStore`.
