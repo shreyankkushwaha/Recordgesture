@@ -68,6 +68,7 @@ import com.example.data.db.RecordingEntity
 import com.example.service.QuickActionAccessibilityService
 import com.example.service.RecordingState
 import com.example.ui.components.AccessibilityStatusBanner
+import com.example.ui.components.BackgroundProtectionCard
 import com.example.ui.components.PermissionsCard
 import com.example.ui.components.RecordHud
 import com.example.ui.components.RecordingsListSection
@@ -527,13 +528,18 @@ private fun CaptureTab(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Action: ${settings.triggerAction.title}. Lock your phone and try it!",
+                            text = "Action: ${settings.triggerAction.title}. Works directly on lock screen without unlocking!",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Background & AutoStart Protection Card
+            BackgroundProtectionCard()
 
             Spacer(modifier = Modifier.height(14.dp))
 
@@ -628,6 +634,11 @@ private fun SettingsTab(
             onSelectTrigger = onSelectTrigger,
             onOpenAccessibilitySettings = onOpenAccessibility
         )
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // Background Protection & Auto-Start (Anti-Force Stop)
+        BackgroundProtectionCard()
 
         Spacer(modifier = Modifier.height(14.dp))
 

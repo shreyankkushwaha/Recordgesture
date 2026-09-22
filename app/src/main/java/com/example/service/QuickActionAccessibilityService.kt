@@ -124,6 +124,11 @@ class QuickActionAccessibilityService : AccessibilityService() {
             return
         }
 
+        provideHapticFeedback()
+
+        val settings = settingsRepository.settings.value
+        val maxDuration = settings.maxDurationSeconds
+
         val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
         val wakeLock = powerManager?.newWakeLock(
             PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
@@ -133,6 +138,31 @@ class QuickActionAccessibilityService : AccessibilityService() {
             wakeLock?.acquire(15_000L)
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+
+        // Start Foreground Service immediately
+        try {
+            RecordingForegroundService.start(applicationContext, 0, maxDuration)
+        } catch (e: Exception) {
+            Log.w("QuickActionService", "Foreground service start: ${e.message}")
+        }
+
+        // START RECORDING DIRECTLY in CameraRecorderManager!
+        try {
+            val recorderManager = CameraRecorderManager.getInstance(applicationContext)
+            if (recorderManager.isInitialized) {
+                recorderManager.startRecording(maxDuration)
+            } else {
+                recorderManager.initializeCamera(
+                    previewView = null,
+                    useFrontCamera = settings.useFrontCamera,
+                    onInitialized = {
+                        recorderManager.startRecording(maxDuration)
+                    }
+                )
+            }
+        } catch (e: Exception) {
+            Log.e("QuickActionService", "Failed to start recording directly: ${e.message}", e)
         }
 
         val launchIntent = Intent(this, MainActivity::class.java).apply {
@@ -169,7 +199,7 @@ class QuickActionAccessibilityService : AccessibilityService() {
         val notification = NotificationCompat.Builder(this, channelId)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle(getString(R.string.notification_recording_title))
-            .setContentText("Hardware button triggered: starting capture automatically…")
+            .setContentText("Hardware button triggered: recording active in background…")
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setFullScreenIntent(pendingIntent, true)
@@ -196,7 +226,7 @@ class QuickActionAccessibilityService : AccessibilityService() {
                 startActivity(launchIntent)
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.w("QuickActionService", "startActivity suppressed, background recording active: ${e.message}")
         }
     }
 

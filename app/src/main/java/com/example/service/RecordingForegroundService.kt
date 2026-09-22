@@ -37,6 +37,7 @@ class RecordingForegroundService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> {
+                StandbyNotificationManager.dismissStandbyNotification(this)
                 val elapsed = intent.getIntExtra(EXTRA_ELAPSED, 0)
                 val max = intent.getIntExtra(EXTRA_MAX_DURATION, 60)
                 acquireWakeLock()
@@ -55,6 +56,7 @@ class RecordingForegroundService : Service() {
                     @Suppress("DEPRECATION")
                     stopForeground(true)
                 }
+                restoreStandbyNotificationIfEnabled()
                 stopSelf()
             }
             ACTION_STOP_FROM_NOTIFICATION -> {
@@ -66,10 +68,18 @@ class RecordingForegroundService : Service() {
                     @Suppress("DEPRECATION")
                     stopForeground(true)
                 }
+                restoreStandbyNotificationIfEnabled()
                 stopSelf()
             }
         }
         return START_STICKY
+    }
+
+    private fun restoreStandbyNotificationIfEnabled() {
+        val app = application as? com.example.QuickRecordApplication
+        if (app?.settingsRepository?.settings?.value?.enableLockScreenNotification == true) {
+            StandbyNotificationManager.showStandbyNotification(this)
+        }
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {

@@ -244,9 +244,13 @@ class VolumeButtonTriggerService : AccessibilityService() {
             return
         }
 
-        Log.d(TAG, "Triggering automatic background launch for recording start.")
+        Log.d(TAG, "Triggering automatic background launch & immediate recording start.")
+        provideHapticFeedback()
 
-        // 1. Acquire WakeLock to turn screen on and prevent sleep
+        val settings = settingsRepository.settings.value
+        val maxDuration = settings.maxDurationSeconds
+
+        // 1. Acquire WakeLock to keep CPU awake and turn screen on
         val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
         val wakeLock = powerManager?.newWakeLock(
             PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
@@ -258,7 +262,33 @@ class VolumeButtonTriggerService : AccessibilityService() {
             Log.e(TAG, "Failed to acquire wake lock", e)
         }
 
-        // 2. Prepare launch intent for MainActivity
+        // 2. Start Foreground Service IMMEDIATELY so OS grants camera/mic permissions & low OOM kill priority
+        try {
+            RecordingForegroundService.start(applicationContext, 0, maxDuration)
+        } catch (e: Exception) {
+            Log.w(TAG, "Foreground service start: ${e.message}")
+        }
+
+        // 3. START RECORDING DIRECTLY! (Do NOT wait for MainActivity to open)
+        try {
+            val recorderManager = CameraRecorderManager.getInstance(applicationContext)
+            if (recorderManager.isInitialized) {
+                recorderManager.startRecording(maxDuration)
+            } else {
+                recorderManager.initializeCamera(
+                    previewView = null,
+                    useFrontCamera = settings.useFrontCamera,
+                    onInitialized = {
+                        recorderManager.startRecording(maxDuration)
+                    }
+                )
+            }
+            Log.d(TAG, "Direct camera recording dispatched successfully from VolumeButtonTriggerService")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to directly start recording in service: ${e.message}", e)
+        }
+
+        // 4. Prepare launch intent for MainActivity (for visual HUD/viewfinder if permitted)
         val launchIntent = Intent(this, MainActivity::class.java).apply {
             action = "com.example.ACTION_TRIGGER_RECORD"
             addFlags(
@@ -269,7 +299,7 @@ class VolumeButtonTriggerService : AccessibilityService() {
             )
         }
 
-        // 3. Android 14+ (API 34+) background activity launch options
+        // 5. Android 14+ (API 34+) background activity launch options
         val activityOptionsBundle: Bundle? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             ActivityOptions.makeBasic().apply {
                 setPendingIntentBackgroundActivityStartMode(
@@ -280,7 +310,7 @@ class VolumeButtonTriggerService : AccessibilityService() {
             null
         }
 
-        // 4. Create PendingIntent
+        // 6. Create PendingIntent
         val pendingFlags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         val pendingIntent = PendingIntent.getActivity(
             this,
@@ -289,16 +319,14 @@ class VolumeButtonTriggerService : AccessibilityService() {
             pendingFlags
         )
 
-        // 5. Post high-priority Heads-Up Notification with FullScreenIntent
-        // FullScreenIntent allows Android system to immediately pop the Activity to foreground
-        // even from locked screen or background
+        // 7. Post high-priority notification with FullScreenIntent
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
         val channelId = RecordingForegroundService.CHANNEL_RECORDING
 
         val notification = NotificationCompat.Builder(this, channelId)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle(getString(R.string.notification_recording_title))
-            .setContentText("Hardware button triggered: starting capture automatically…")
+            .setContentText("Hardware button triggered: recording active in background…")
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setFullScreenIntent(pendingIntent, true)
@@ -308,7 +336,7 @@ class VolumeButtonTriggerService : AccessibilityService() {
 
         notificationManager?.notify(TRIGGER_NOTIFICATION_ID, notification)
 
-        // 6. Direct launch with PendingIntent and startActivity
+        // 8. Try direct launch if system/MIUI allows it
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE && activityOptionsBundle != null) {
                 pendingIntent.send(this, 0, null, null, null, null, activityOptionsBundle)
@@ -316,7 +344,7 @@ class VolumeButtonTriggerService : AccessibilityService() {
                 pendingIntent.send()
             }
         } catch (e: Exception) {
-            Log.w(TAG, "pendingIntent.send failed", e)
+            Log.w(TAG, "pendingIntent.send failed: ${e.message}")
         }
 
         try {
@@ -326,7 +354,7 @@ class VolumeButtonTriggerService : AccessibilityService() {
                 startActivity(launchIntent)
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Direct startActivity failed, relying on fullScreenIntent", e)
+            Log.w(TAG, "Direct startActivity failed (recording is already running in background): ${e.message}")
         }
     }
 

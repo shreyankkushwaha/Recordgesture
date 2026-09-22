@@ -154,26 +154,32 @@ class CameraRecorderManager(
                 CameraSelector.DEFAULT_BACK_CAMERA
             }
 
-            val newPreview = Preview.Builder().build().also { p ->
-                previewView?.let { pv ->
-                    p.setSurfaceProvider(pv.surfaceProvider)
-                }
-            }
-            this.preview = newPreview
-
             val recorder = Recorder.Builder()
                 .setQualitySelector(QualitySelector.from(Quality.HD))
                 .build()
 
             videoCapture = VideoCapture.withOutput(recorder)
 
-            provider.bindToLifecycle(
-                persistentLifecycleOwner,
-                cameraSelector,
-                newPreview,
-                videoCapture
-            )
-            Log.d("CameraRecorderManager", "Camera use cases bound with persistent lifecycle (front=$useFrontCamera)")
+            if (previewView != null) {
+                val newPreview = Preview.Builder().build().also { p ->
+                    p.setSurfaceProvider(previewView.surfaceProvider)
+                }
+                this.preview = newPreview
+                provider.bindToLifecycle(
+                    persistentLifecycleOwner,
+                    cameraSelector,
+                    newPreview,
+                    videoCapture
+                )
+            } else {
+                this.preview = null
+                provider.bindToLifecycle(
+                    persistentLifecycleOwner,
+                    cameraSelector,
+                    videoCapture
+                )
+            }
+            Log.d("CameraRecorderManager", "Camera use cases bound with persistent lifecycle (front=$useFrontCamera, hasPreview=${previewView != null})")
         } catch (e: Exception) {
             e.printStackTrace()
             Log.e("CameraRecorderManager", "Error binding camera: ${e.localizedMessage}", e)
@@ -186,6 +192,18 @@ class CameraRecorderManager(
     fun startRecording(maxDurationSeconds: Int = 60, retryCount: Int = 0) {
         if (isRecordingActive) {
             Log.d("CameraRecorderManager", "Recording is already active, ignoring start request")
+            return
+        }
+
+        if (cameraProvider == null) {
+            Log.d("CameraRecorderManager", "CameraProvider not initialized in startRecording, initializing now...")
+            initializeCamera(
+                previewView = currentPreviewView,
+                useFrontCamera = currentUseFrontCamera,
+                onInitialized = {
+                    startRecording(maxDurationSeconds, retryCount)
+                }
+            )
             return
         }
 

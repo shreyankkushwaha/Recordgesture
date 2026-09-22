@@ -40,6 +40,10 @@ class QuickRecordApplication : Application() {
         cloudBackupManager = CloudBackupManager(this)
 
         createNotificationChannels()
+
+        if (settingsRepository.settings.value.enableLockScreenNotification) {
+            com.example.service.StandbyNotificationManager.showStandbyNotification(this)
+        }
     }
 
     private fun createNotificationChannels() {

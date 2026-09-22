@@ -93,16 +93,14 @@ class MainActivity : ComponentActivity() {
             setTurnScreenOn(true)
             val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
             keyguardManager?.requestDismissKeyguard(this, null)
-        } else {
-            @Suppress("DEPRECATION")
-            window.addFlags(
-                WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
-                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
-                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
-            )
         }
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        @Suppress("DEPRECATION")
+        window.addFlags(
+            WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
+            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+            WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+        )
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -128,6 +126,14 @@ class MainActivity : ComponentActivity() {
                 } else null
 
                 lifecycleScope.launch {
+                    // If recording is already actively running (e.g. started by background service),
+                    // reattach preview so user can monitor it and don't restart recording!
+                    if (recorderManager.recordingState.value.isRecording || CameraRecorderManager.isRecordingActive) {
+                        Log.d("MainActivity", "Recording already actively running, reattaching preview")
+                        recorderManager.attachPreview(previewView)
+                        return@launch
+                    }
+
                     if (!isCameraReady) {
                         Log.d("MainActivity", "Camera not ready yet when trigger received, waiting...")
                         var attempts = 0
@@ -135,6 +141,11 @@ class MainActivity : ComponentActivity() {
                             delay(200L)
                             attempts++
                         }
+                    }
+
+                    if (recorderManager.recordingState.value.isRecording || CameraRecorderManager.isRecordingActive) {
+                        recorderManager.attachPreview(previewView)
+                        return@launch
                     }
 
                     if (useFront != null && useFront != viewModel.settings.value.useFrontCamera) {
@@ -167,6 +178,9 @@ class MainActivity : ComponentActivity() {
         recorderManager.attachPreview(previewView)
         if (viewModel.settings.value.triggerAction == TriggerAction.SHAKE_GESTURE) {
             shakeDetector?.startListening()
+        }
+        if (viewModel.settings.value.enableLockScreenNotification) {
+            com.example.service.StandbyNotificationManager.showStandbyNotification(this)
         }
     }
 

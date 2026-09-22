@@ -21,6 +21,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
@@ -111,6 +112,16 @@
             <intent-filter>
                 <action android:name="com.example.schedule.ACTION_ALARM_TRIGGER" />
                 <action android:name="com.example.schedule.ACTION_CANCEL_SCHEDULE" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Broadcast Receiver for Lock Screen 1-Tap Standby Notification Actions -->
+        <receiver
+            android:name=".service.QuickRecordActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.example.service.ACTION_START_RECORD" />
+                <action android:name="com.example.service.ACTION_STOP_RECORD" />
             </intent-filter>
         </receiver>
 
