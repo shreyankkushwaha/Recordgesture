@@ -30,6 +30,9 @@ class ExampleRobolectricTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val repository = SettingsRepository(context)
 
+        assertEquals(TriggerAction.VOLUME_DOWN_5X, repository.settings.value.triggerAction)
+
+        repository.updateTriggerAction(TriggerAction.VOLUME_DOWN_DOUBLE)
         assertEquals(TriggerAction.VOLUME_DOWN_DOUBLE, repository.settings.value.triggerAction)
 
         repository.updateTriggerAction(TriggerAction.VOLUME_LONG_PRESS)
@@ -38,8 +41,8 @@ class ExampleRobolectricTest {
         repository.updateTriggerAction(TriggerAction.QUICK_SETTINGS_TILE)
         assertEquals(TriggerAction.QUICK_SETTINGS_TILE, repository.settings.value.triggerAction)
 
-        repository.updateTriggerAction(TriggerAction.VOLUME_LONG_PRESS)
-        assertEquals(TriggerAction.VOLUME_LONG_PRESS, repository.settings.value.triggerAction)
+        repository.updateTriggerAction(TriggerAction.VOLUME_DOWN_5X)
+        assertEquals(TriggerAction.VOLUME_DOWN_5X, repository.settings.value.triggerAction)
 
         repository.updateMaxDuration(180)
         assertEquals(180, repository.settings.value.maxDurationSeconds)

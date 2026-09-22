@@ -67,6 +67,7 @@ import com.example.camera.CameraRecorderManager
 import com.example.data.db.RecordingEntity
 import com.example.service.QuickActionAccessibilityService
 import com.example.service.RecordingState
+import com.example.ui.components.AccessibilityStatusBanner
 import com.example.ui.components.PermissionsCard
 import com.example.ui.components.RecordHud
 import com.example.ui.components.RecordingsListSection
@@ -200,6 +201,7 @@ fun MainScreen(
                 0 -> CaptureTab(
                     recordingState = recordingState,
                     settings = settings,
+                    isAccessibilityEnabled = isAccessibilityEnabled,
                     activeSchedule = activeSchedule,
                     formattedCountdown = formattedCountdown,
                     previewView = previewView,
@@ -208,6 +210,9 @@ fun MainScreen(
                     onOpenScheduleDialog = { showScheduleDialog = true },
                     onCancelSchedule = { viewModel.cancelScheduledRecording() },
                     onStartScheduledNow = { viewModel.triggerScheduledRecordingNow() },
+                    onOpenAccessibility = {
+                        context.startActivity(QuickActionAccessibilityService.openAccessibilitySettingsIntent())
+                    },
                     onPermissionsUpdated = {
                         viewModel.checkAccessibilityStatus(context)
                     }
@@ -236,7 +241,12 @@ fun MainScreen(
                         context.startActivity(QuickActionAccessibilityService.openAccessibilitySettingsIntent())
                     },
                     onMaxDurationChanged = { viewModel.updateMaxDuration(it) },
-                    onUseFrontCameraChanged = { viewModel.updateUseFrontCamera(it) },
+                    onUseFrontCameraChanged = { front ->
+                        viewModel.updateUseFrontCamera(front)
+                        if (!recordingState.isRecording) {
+                            recorderManager.bindCameraUseCases(previewView, front)
+                        }
+                    },
                     onAutoEncryptChanged = { viewModel.updateAutoEncrypt(it) },
                     onAutoCloudBackupChanged = { viewModel.updateAutoCloudBackup(it) },
                     onLockScreenNotifChanged = { viewModel.updateEnableLockScreenNotification(it) },
@@ -282,6 +292,7 @@ fun MainScreen(
 private fun CaptureTab(
     recordingState: RecordingState,
     settings: com.example.data.preferences.UserSettings,
+    isAccessibilityEnabled: Boolean,
     activeSchedule: com.example.schedule.ScheduledRecording?,
     formattedCountdown: String,
     previewView: PreviewView,
@@ -290,6 +301,7 @@ private fun CaptureTab(
     onOpenScheduleDialog: () -> Unit,
     onCancelSchedule: () -> Unit,
     onStartScheduledNow: () -> Unit,
+    onOpenAccessibility: () -> Unit,
     onPermissionsUpdated: () -> Unit
 ) {
     val scrollState = rememberScrollState()
@@ -353,6 +365,19 @@ private fun CaptureTab(
 
         // Permissions Check Banner
         PermissionsCard(onPermissionsUpdated = onPermissionsUpdated)
+
+        val requiresAccessibility = settings.triggerAction == com.example.data.preferences.TriggerAction.VOLUME_DOWN_5X ||
+                settings.triggerAction == com.example.data.preferences.TriggerAction.VOLUME_LONG_PRESS ||
+                settings.triggerAction == com.example.data.preferences.TriggerAction.VOLUME_DOWN_DOUBLE ||
+                settings.triggerAction == com.example.data.preferences.TriggerAction.VOLUME_UP_DOUBLE
+
+        if (requiresAccessibility && !isAccessibilityEnabled) {
+            Spacer(modifier = Modifier.height(14.dp))
+            AccessibilityStatusBanner(
+                isEnabled = isAccessibilityEnabled,
+                onOpenSettings = onOpenAccessibility
+            )
+        }
 
         Spacer(modifier = Modifier.height(14.dp))
 

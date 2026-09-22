@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -27,32 +28,42 @@ class MainActivity : ComponentActivity() {
     private lateinit var recorderManager: CameraRecorderManager
     private lateinit var previewView: PreviewView
     private var shakeDetector: ShakeDetector? = null
+    private var isCameraReady: Boolean = false
+    private var pendingTriggerIntent: Intent? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         configureLockScreenVisibility()
 
+        // Cache incoming intent if triggered on launch
+        if (intent?.action == "com.example.ACTION_TRIGGER_RECORD" || intent?.action == "com.example.ACTION_STOP_RECORD") {
+            pendingTriggerIntent = Intent(intent)
+        }
+
         previewView = PreviewView(this).apply {
             implementationMode = PreviewView.ImplementationMode.COMPATIBLE
         }
 
-        recorderManager = CameraRecorderManager(
-            context = applicationContext,
-            coroutineScope = lifecycleScope
-        ).apply {
+        recorderManager = CameraRecorderManager.getInstance(applicationContext).apply {
             onRecordingFinished = { file, durationMs ->
                 viewModel.onRecordingSaved(file, durationMs)
             }
         }
 
-        // Initialize Camera
+        // Initialize Camera with persistent lifecycle and explicit ready callback
         recorderManager.initializeCamera(
-            lifecycleOwner = this,
             previewView = previewView,
             useFrontCamera = viewModel.settings.value.useFrontCamera,
             onInitialized = {
-                handleTriggerIntent(intent)
+                Log.d("MainActivity", "Camera fully initialized, processing trigger if pending")
+                isCameraReady = true
+                pendingTriggerIntent?.let { pendingIntent ->
+                    pendingTriggerIntent = null
+                    handleTriggerIntent(pendingIntent)
+                } ?: run {
+                    handleTriggerIntent(intent)
+                }
             }
         )
 
@@ -117,12 +128,21 @@ class MainActivity : ComponentActivity() {
                 } else null
 
                 lifecycleScope.launch {
+                    if (!isCameraReady) {
+                        Log.d("MainActivity", "Camera not ready yet when trigger received, waiting...")
+                        var attempts = 0
+                        while (!isCameraReady && attempts < 15) {
+                            delay(200L)
+                            attempts++
+                        }
+                    }
+
                     if (useFront != null && useFront != viewModel.settings.value.useFrontCamera) {
-                        recorderManager.bindCameraUseCases(this@MainActivity, previewView, useFront)
-                        delay(350L)
+                        recorderManager.bindCameraUseCases(previewView, useFront)
+                        delay(250L)
                     } else {
                         // Small delay to ensure CameraX surface provider is attached
-                        delay(300L)
+                        delay(200L)
                     }
                     val targetDuration = if (scheduledDuration > 0) scheduledDuration else viewModel.settings.value.maxDurationSeconds
                     triggerStartRecording(targetDuration)
@@ -144,6 +164,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         viewModel.checkAccessibilityStatus(this)
+        recorderManager.attachPreview(previewView)
         if (viewModel.settings.value.triggerAction == TriggerAction.SHAKE_GESTURE) {
             shakeDetector?.startListening()
         }
@@ -155,7 +176,10 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        recorderManager.release()
+        // Only release camera resources if NOT actively recording in the background
+        if (!recorderManager.recordingState.value.isRecording) {
+            recorderManager.release()
+        }
         super.onDestroy()
     }
 }

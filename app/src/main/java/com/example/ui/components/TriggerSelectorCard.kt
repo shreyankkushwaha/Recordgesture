@@ -96,7 +96,8 @@ fun TriggerSelectorCard(
             }
 
             // Accessibility Warning if Volume buttons are selected but service is disabled
-            val requiresAccessibility = currentTrigger == TriggerAction.VOLUME_LONG_PRESS ||
+            val requiresAccessibility = currentTrigger == TriggerAction.VOLUME_DOWN_5X ||
+                    currentTrigger == TriggerAction.VOLUME_LONG_PRESS ||
                     currentTrigger == TriggerAction.VOLUME_DOWN_DOUBLE ||
                     currentTrigger == TriggerAction.VOLUME_UP_DOUBLE
 
@@ -118,6 +119,7 @@ private fun TriggerOptionItem(
     onClick: () -> Unit
 ) {
     val icon: ImageVector = when (action) {
+        TriggerAction.VOLUME_DOWN_5X -> Icons.AutoMirrored.Filled.VolumeDown
         TriggerAction.VOLUME_LONG_PRESS -> Icons.AutoMirrored.Filled.VolumeUp
         TriggerAction.VOLUME_DOWN_DOUBLE -> Icons.AutoMirrored.Filled.VolumeDown
         TriggerAction.VOLUME_UP_DOUBLE -> Icons.AutoMirrored.Filled.VolumeUp
@@ -187,7 +189,7 @@ private fun TriggerOptionItem(
 }
 
 @Composable
-private fun AccessibilityStatusBanner(
+fun AccessibilityStatusBanner(
     isEnabled: Boolean,
     onOpenSettings: () -> Unit
 ) {

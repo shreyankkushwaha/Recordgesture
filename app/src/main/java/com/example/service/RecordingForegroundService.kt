@@ -57,8 +57,27 @@ class RecordingForegroundService : Service() {
                 }
                 stopSelf()
             }
+            ACTION_STOP_FROM_NOTIFICATION -> {
+                com.example.camera.CameraRecorderManager.stopActiveRecording()
+                releaseWakeLock()
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                } else {
+                    @Suppress("DEPRECATION")
+                    stopForeground(true)
+                }
+                stopSelf()
+            }
         }
-        return START_NOT_STICKY
+        return START_STICKY
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        android.util.Log.d(
+            "RecordingForegroundService",
+            "App swiped away from recents; activeRecording=${com.example.camera.CameraRecorderManager.isRecordingActive}"
+        )
     }
 
     private fun acquireWakeLock() {
@@ -116,12 +135,11 @@ class RecordingForegroundService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // Stop recording intent
-        val stopIntent = Intent(this, MainActivity::class.java).apply {
-            action = "com.example.ACTION_STOP_RECORD"
-            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        // Direct stop recording intent (stops background capture immediately from notification)
+        val stopIntent = Intent(this, RecordingForegroundService::class.java).apply {
+            action = ACTION_STOP_FROM_NOTIFICATION
         }
-        val stopPendingIntent = PendingIntent.getActivity(
+        val stopPendingIntent = PendingIntent.getService(
             this,
             101,
             stopIntent,
@@ -195,6 +213,7 @@ class RecordingForegroundService : Service() {
         const val ACTION_START = "com.example.service.START_RECORDING_SERVICE"
         const val ACTION_UPDATE = "com.example.service.UPDATE_RECORDING_SERVICE"
         const val ACTION_STOP = "com.example.service.STOP_RECORDING_SERVICE"
+        const val ACTION_STOP_FROM_NOTIFICATION = "com.example.service.ACTION_STOP_FROM_NOTIFICATION"
 
         const val EXTRA_ELAPSED = "extra_elapsed"
         const val EXTRA_MAX_DURATION = "extra_max_duration"

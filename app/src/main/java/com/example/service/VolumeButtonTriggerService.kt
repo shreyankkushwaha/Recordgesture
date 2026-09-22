@@ -48,9 +48,11 @@ class VolumeButtonTriggerService : AccessibilityService() {
     private var volumeUpPressStartTime = 0L
     private var isLongPressTriggered = false
 
-    // State tracking for Volume Double-Press
+    // State tracking for Volume Double-Press & Multi-Press
     private var lastVolumeDownClickTime = 0L
     private var lastVolumeUpClickTime = 0L
+    private var volumeDownPressCount = 0
+    private var lastVolumeDownPressTimestamp = 0L
 
     private val longPressRunnable = Runnable {
         isLongPressTriggered = true
@@ -108,12 +110,30 @@ class VolumeButtonTriggerService : AccessibilityService() {
             }
         }
 
-        // Check if current setting is Volume Double-Press
+        // Check if current setting is Volume Multi-Press or Double-Press
         if (action == KeyEvent.ACTION_DOWN) {
             val now = System.currentTimeMillis()
             when (keyCode) {
                 KeyEvent.KEYCODE_VOLUME_DOWN -> {
-                    if (currentTrigger == TriggerAction.VOLUME_DOWN_DOUBLE) {
+                    if (currentTrigger == TriggerAction.VOLUME_DOWN_5X) {
+                        if (now - lastVolumeDownPressTimestamp > MULTI_PRESS_TIMEOUT_MS) {
+                            volumeDownPressCount = 1
+                        } else {
+                            volumeDownPressCount++
+                        }
+                        lastVolumeDownPressTimestamp = now
+
+                        // Light tick feedback for each press
+                        provideTickHapticFeedback()
+
+                        if (volumeDownPressCount >= 5) {
+                            volumeDownPressCount = 0
+                            lastVolumeDownPressTimestamp = 0L
+                            provideHapticFeedback()
+                            triggerToggleRecording()
+                            return true
+                        }
+                    } else if (currentTrigger == TriggerAction.VOLUME_DOWN_DOUBLE) {
                         if (now - lastVolumeDownClickTime < DOUBLE_PRESS_WINDOW_MS) {
                             lastVolumeDownClickTime = 0L
                             provideHapticFeedback()
@@ -354,6 +374,27 @@ class VolumeButtonTriggerService : AccessibilityService() {
         }
     }
 
+    private fun provideTickHapticFeedback() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val vibratorManager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                } else null
+                val vibrator = vibratorManager?.defaultVibrator ?: (getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator)
+                vibrator?.vibrate(
+                    VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK)
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                @Suppress("DEPRECATION")
+                vibrator?.vibrate(25L)
+            }
+        } catch (e: Exception) {
+            // Ignore if vibration fails
+        }
+    }
+
     override fun onDestroy() {
         cancelLongPressTimer()
         super.onDestroy()
@@ -364,6 +405,7 @@ class VolumeButtonTriggerService : AccessibilityService() {
         private const val TAG = "VolumeTriggerService"
         const val LONG_PRESS_THRESHOLD_MS = 800L
         private const val DOUBLE_PRESS_WINDOW_MS = 600L
+        private const val MULTI_PRESS_TIMEOUT_MS = 750L
         private const val TRIGGER_REQUEST_CODE = 4001
         private const val TRIGGER_NOTIFICATION_ID = 2005
 

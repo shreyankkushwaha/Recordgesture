@@ -23,12 +23,12 @@ class SettingsRepository(context: Context) {
     }
 
     private fun loadSettings(): UserSettings {
-        val triggerName = prefs.getString(KEY_TRIGGER, TriggerAction.VOLUME_DOWN_DOUBLE.name)
-            ?: TriggerAction.VOLUME_DOWN_DOUBLE.name
+        val triggerName = prefs.getString(KEY_TRIGGER, TriggerAction.VOLUME_DOWN_5X.name)
+            ?: TriggerAction.VOLUME_DOWN_5X.name
         val trigger = try {
             TriggerAction.valueOf(triggerName)
         } catch (e: Exception) {
-            TriggerAction.VOLUME_DOWN_DOUBLE
+            TriggerAction.VOLUME_DOWN_5X
         }
 
         return UserSettings(

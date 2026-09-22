@@ -1,6 +1,10 @@
 package com.example.data.preferences
 
 enum class TriggerAction(val title: String, val description: String) {
+    VOLUME_DOWN_5X(
+        "Volume Down 5-Press (Recommended)",
+        "Press the physical Volume Down button 5 times quickly to start or stop recording in background"
+    ),
     VOLUME_LONG_PRESS(
         "Volume Long-Press (Start / Stop)",
         "Hold Volume Down or Volume Up for 1 second to toggle (start or stop) video & audio recording"
@@ -28,7 +32,7 @@ enum class TriggerAction(val title: String, val description: String) {
 }
 
 data class UserSettings(
-    val triggerAction: TriggerAction = TriggerAction.VOLUME_LONG_PRESS,
+    val triggerAction: TriggerAction = TriggerAction.VOLUME_DOWN_5X,
     val maxDurationSeconds: Int = 60, // 0 = unlimited, or 30, 60, 180, 300, 600
     val useFrontCamera: Boolean = false,
     val autoEncrypt: Boolean = false,

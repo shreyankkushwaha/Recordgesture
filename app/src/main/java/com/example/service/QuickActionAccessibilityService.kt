@@ -29,6 +29,8 @@ class QuickActionAccessibilityService : AccessibilityService() {
     private lateinit var settingsRepository: SettingsRepository
     private var lastVolumeDownTime = 0L
     private var lastVolumeUpTime = 0L
+    private var volumeDownPressCount = 0
+    private var lastVolumeDownPressTimestamp = 0L
 
     override fun onCreate() {
         super.onCreate()
@@ -71,7 +73,23 @@ class QuickActionAccessibilityService : AccessibilityService() {
 
         when (event.keyCode) {
             KeyEvent.KEYCODE_VOLUME_DOWN -> {
-                if (currentTrigger == TriggerAction.VOLUME_DOWN_DOUBLE) {
+                if (currentTrigger == TriggerAction.VOLUME_DOWN_5X) {
+                    if (now - lastVolumeDownPressTimestamp > MULTI_PRESS_TIMEOUT_MS) {
+                        volumeDownPressCount = 1
+                    } else {
+                        volumeDownPressCount++
+                    }
+                    lastVolumeDownPressTimestamp = now
+                    provideTickHapticFeedback()
+
+                    if (volumeDownPressCount >= 5) {
+                        volumeDownPressCount = 0
+                        lastVolumeDownPressTimestamp = 0L
+                        provideHapticFeedback()
+                        triggerQuickRecord()
+                        return true
+                    }
+                } else if (currentTrigger == TriggerAction.VOLUME_DOWN_DOUBLE) {
                     if (now - lastVolumeDownTime < DOUBLE_PRESS_WINDOW_MS) {
                         lastVolumeDownTime = 0L
                         provideHapticFeedback()
@@ -224,8 +242,30 @@ class QuickActionAccessibilityService : AccessibilityService() {
         }
     }
 
+    private fun provideTickHapticFeedback() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val vibratorManager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                } else null
+                val vibrator = vibratorManager?.defaultVibrator ?: (getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator)
+                vibrator?.vibrate(
+                    VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK)
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                @Suppress("DEPRECATION")
+                vibrator?.vibrate(25L)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     companion object {
         private const val DOUBLE_PRESS_WINDOW_MS = 600L
+        private const val MULTI_PRESS_TIMEOUT_MS = 750L
 
         fun isAccessibilityServiceEnabled(context: Context): Boolean {
             return VolumeButtonTriggerService.isAccessibilityServiceEnabled(context)
